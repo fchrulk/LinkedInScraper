@@ -41,6 +41,8 @@ if __name__ == "__main__":
 ## Authors
 
 * **Fachrul Kurniansyah** - *LinkedInScraper* - [fchrulk](https://github.com/fchrulk)
+
 You can visit my LinkedIn [here](https://www.linkedin.com/in/fchrulk).
+
 Email : [fchrulk@outlook.com]
 
