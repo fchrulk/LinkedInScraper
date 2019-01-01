@@ -37,6 +37,7 @@ if __name__ == "__main__":
 
 	main()
 ```
+The folder "LinkedIn_Scrape_Result" will be generated to store the output (JSON Format) after scrape proccess finished.
 
 ### Built with
 * [**MechanicalSoup**](https://github.com/MechanicalSoup/MechanicalSoup/) - Core package
