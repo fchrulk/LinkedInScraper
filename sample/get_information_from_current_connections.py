@@ -2,7 +2,7 @@ from LinkedInScraper import LinkedInScraper
 import argparse
 
 def main():
-	scraper = LinkedInScraper(email=args['email'], password=args["password"])
+	scraper = LinkedInScraper.LinkedInScraper(email=args['email'], password=args["password"])
 	scraper.get_user_connections(complete=False)
 
 if __name__ == "__main__":
