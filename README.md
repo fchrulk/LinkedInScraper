@@ -38,6 +38,9 @@ if __name__ == "__main__":
 	main()
 ```
 
+### Built with
+* [**MechanicalSoup**](https://github.com/MechanicalSoup/MechanicalSoup/) - Core package
+
 ## Authors
 
 * **Fachrul Kurniansyah** - *LinkedInScraper* - [fchrulk](https://github.com/fchrulk)
