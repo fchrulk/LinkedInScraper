@@ -4,7 +4,9 @@ Getting data from public LinkedIn Account and still on progress to scrape possib
 ## Getting started
 This package allow you to get possible public information data on LinkedIn using Python 3.6
 Right now, it only can be used to login and retrieve information of your current connections, get full company information by LinkedIn url, get employees data from company, and search company by keyword.
-The development is still quite far away. My advice is not to over-take data, maybe just take 50 ~ 100 data per day. LinkedIn can limit data retrieval by notifying "restricted accounts". If this happens, you need to verify your account using a resident card or similar card. So, take your own risk.
+The development is still quite far away. 
+
+My advice is not to over-take data, maybe just take 50 ~ 100 data per day. LinkedIn can limit data retrieval by notifying "restricted accounts". If this happens, you need to verify your account using a resident card or similar card. So, take your own risk.
 
 ### Prerequisites
 I am running on Windows OS, Python 3.6. Below are the packages that I use to create this script.
