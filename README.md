@@ -43,10 +43,29 @@ Or this way if you running on Jupyter Notebook
 ```
 from LinkedInScraper import LinkedInScraper
 
+# Login using your account
 scraper = LinkedInScraper.LinkedInScraper(email="your-email", password="your-password")
+
+# Get current connections
 scraper.get_user_connections(complete=True)
+
+# Search companies by keyword
+scraper.search_companies_by_keyword(keyword="social media")
+
+# Get full information of company
+scraper.get_company(url="https://www.linkedin.com/company/upwork", save_as='json')
+
+# Get complete information of employees on a company
+## save_as="csv" can be use
+scraper.search_employees_by_company(companyName="Upwork", companyUrn="4827017", complete_information=True, save_as='json')
+
+# Get basic information of employees on a company
+## save_as="csv" can be use
+scraper.search_employees_by_company(companyName="Upwork", companyUrn="4827017", complete_information=False, save_as='json')
+
 ```
 The folder "LinkedIn_Scrape_Result" will be generated to store the output (JSON Format) after scrape proccess finished.
+
 
 ### Built with
 * [**MechanicalSoup**](https://github.com/MechanicalSoup/MechanicalSoup/) - Core package
