@@ -5,14 +5,27 @@ import re
 import os
 from pprint import pprint
 from unidecode import unidecode
+import pandas as pd
+from time import sleep
 
 class LinkedInScraper():
     def __init__(self, email, password):
         self.RESULT_DIR = os.getcwd()+"/LinkedIn_Scrape_Result/"
         if not os.path.exists(self.RESULT_DIR):
             os.makedirs(self.RESULT_DIR)
-        self.browser = self.start_mechanicalsoup_browser()
-        self.credentialInfo = self.login(self.browser, email, password)
+        err_count = 0
+        con = True
+        while err_count < 6 and con == True:
+            try:
+                self.browser = self.start_mechanicalsoup_browser()
+                self.credentialInfo = self.login(self.browser, email, password)
+                con = False
+            except Exception as e:
+                self.browser.close()
+                print("Some error happened, trying again...")
+                print(e)
+                err_count+=1
+                sleep(5)   
         
     def start_mechanicalsoup_browser(self):
         browser = mechanicalsoup.StatefulBrowser()
@@ -33,8 +46,49 @@ class LinkedInScraper():
         return login_info
     
     def get_user_connections(self, complete):
-        friends = GetMainConnections(self.browser, self.credentialInfo, self.RESULT_DIR, complete)
-
+        self.result = GetMainConnections(self.browser, self.credentialInfo, self.RESULT_DIR, complete)
+    
+    def search_companies_by_keyword(self, keyword):
+        self.result = SearchCompanies(self.browser, keyword, self.RESULT_DIR)
+        
+    def search_employees_by_company(self, companyName, companyUrn, complete_information, save_as=None):
+        self.result = GetEmployeeOfCompany(self.browser, companyName, companyUrn, self.RESULT_DIR, self.credentialInfo, complete_information)
+        if save_as != None:
+            save_dir = self.RESULT_DIR+"{}_{}/".format(companyName, companyUrn)
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            if save_as == "json":
+                if type(self.result.searchEmployeeResult) == pd.core.frame.DataFrame:
+                    self.result.searchEmployeeResult = self.result.searchEmployeeResult.to_dict("records")
+                    with open("{}{}_{}_employees.json".format(save_dir, companyName, companyUrn), "w") as f:
+                        for i in self.result.searchEmployeeResult:
+                            f.writelines(json.dumps(i)+"\n")
+                    f.close()
+                else:
+                    with open("{}{}_{}_employees.json".format(save_dir, companyName, companyUrn), "w") as f:
+                        for i in self.result.searchEmployeeResult:
+                            f.writelines(json.dumps(i)+"\n")
+                    f.close()
+            elif save_as == "csv":
+                if type(self.result.searchEmployeeResult) == pd.core.frame.DataFrame:
+                    self.result.searchEmployeeResult.to_csv("{}{}_{}_employees.csv".format(save_dir, companyName, companyUrn), index=False)
+                else:
+                    self.result.searchEmployeeResult = pd.DataFrame(self.result.searchEmployeeResult)
+                    self.result.searchEmployeeResult.to_csv("{}{}_{}_employees.csv".format(save_dir, companyName, companyUrn), index=False)
+        
+    def get_company(self, url, enable_information=False, save_as=None):
+        self.result = GetCompany(self.browser, url, self.credentialInfo, enable_information)
+        companyName = self.result.companyDetails['name']
+        companyUrn = self.result.companyDetails['id']
+        if save_as != None:
+            save_dir = self.RESULT_DIR+"{}_{}/".format(companyName, companyUrn)
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            if save_as == "json":
+                with open("{}{}_{}_details.json".format(save_dir, companyName, companyUrn), "w") as f:
+                    f.writelines(json.dumps(self.result.companyDetails))
+                f.close()
+            
 class GetMainConnections():
     def __init__(self, browser, credentialInfo, RESULT_DIR, complete=False):
         self.userConnections = self.get_friends(browser, credentialInfo, RESULT_DIR, complete)
@@ -128,6 +182,7 @@ class LinkedInUserExtractor():
     def extract_user_basic_info(source, kind, login_info=""):
         info = []
         soup = source.soup.find_all("code")
+        con = True
         for i in soup:
             try:
                 i = json.loads(i.text)
@@ -140,8 +195,14 @@ class LinkedInUserExtractor():
                             info.append(j)
                 else:
                     if i['included'] != []:
-                        info = i['included']
-                        break
+                        for j in i['included']:
+                            if "firstName" in j:
+                                info = i['included']
+                                con = False
+                                break
+                        if con == False:
+                            break
+                        
         for i in info:
             if "$type" in i:
                 if i["$type"] == "com.linkedin.voyager.identity.shared.MiniProfile":
@@ -188,7 +249,7 @@ class LinkedInUserExtractor():
 
             ## work experience
             if i['$type'] == "com.linkedin.voyager.identity.profile.Position":
-                work_companyName = i['companyName']
+                work_companyName = LinkedInUserExtractor.if_else("companyName",i)
                 work_companyUrn = LinkedInUserExtractor.if_else("companyUrn",i)
                 work_jobDescription = LinkedInUserExtractor.if_else('description',i)
                 work_locationName = LinkedInUserExtractor.if_else('locationName',i)
@@ -234,7 +295,10 @@ class LinkedInUserExtractor():
 
             ## education
             if i['$type'] == "com.linkedin.voyager.identity.profile.Education":
-                edu_schoolName = i['schoolName']
+                try:
+                    edu_schoolName = LinkedInUserExtractor.if_else('schoolName',i)
+                except KeyError:
+                    edu_schoolName = None
                 edu_schoolUrn = LinkedInUserExtractor.if_else('schoolUrn',i)
                 edu_degreeName = LinkedInUserExtractor.if_else('degreeName',i)
                 edu_degreeUrn = LinkedInUserExtractor.if_else('degreeUrn',i)
@@ -289,7 +353,6 @@ class LinkedInUserExtractor():
                             cert_timePeriod = "-/{} - {}/{}".format(period['startDate']['month'],
                                                                     period['endDate']['year'],period['endDate']['month'])
                         else:
-                            print("173")
                             pprint(i['timePeriod'])
                     elif 'startDate' not in i['timePeriod'] and 'endDate' in i['timePeriod']:
                         if "year" in i['timePeriod']['endDate'] and "month" in i['timePeriod']['endDate']:
@@ -299,7 +362,6 @@ class LinkedInUserExtractor():
                         elif "year" not in i['timePeriod']['endDate'] and "month" in i['timePeriod']['endDate']:
                             cert_timePeriod = "Undefined - -/{}".format(period['endDate']['month'])
                         else:
-                            print("183")
                             pprint(i['timePeriod'])
                     elif 'startDate' in i['timePeriod'] and 'endDate' not in i['timePeriod']:
                         if "year" in i['timePeriod']['startDate'] and "month" in i['timePeriod']['startDate']:
@@ -309,7 +371,6 @@ class LinkedInUserExtractor():
                         elif "year" not in i['timePeriod']['startDate'] and "month" in i['timePeriod']['startDate']:
                             cert_timePeriod = "-/{} - No expires".format(period['startDate']['month'])
                         else:
-                            print("193")
                             pprint(i['timePeriod'])
                     else:
                         cert_timePeriod = None
@@ -414,6 +475,9 @@ class LinkedInUserExtractor():
         contact = browser.open(url)
         try:
             contact = json.loads([i for i in contact.soup.find_all('code') if "profile.ProfileContactInfo" in str(i)][0].text)
+        except IndexError:
+            contact = []
+        if len(contact) > 0:
             if 'emailAddress' in contact['data']:
                 email = contact['data']['emailAddress']
             else:
@@ -430,8 +494,241 @@ class LinkedInUserExtractor():
             if "twitterHandles" in contact['data']:
                 for t in contact['data']['twitterHandles']:
                     twitter.append(t)
-            return email, phone, address, twitter
-        except:
-            print(contact.soup.prettify())
-            print(url)
+        else:
+            email = None
+            phone = []
+            address = None
+            twitter = []
+        return email, phone, address, twitter
+            
+class GetCompany():
+    def __init__(self, browser, url, login_info, enable_information=False):
+        self.companyDetails = self.get_page_public_info(browser, url, login_info, enable_information)
+        
+    def get_page_public_info(self, browser, url, login_info, enable_information=False):
+        page = browser.open(url)
+        con = False
+        for i in page.soup.find_all("code"):
+            try:
+                i = json.loads(i.text)
+            except:
+                pass
+            if 'included' in i:
+                for j in i['included']:
+                    if j['$type'] == "com.linkedin.voyager.common.FollowingInfo":
+                        con = True
+                        break
+            if con == True:
+                break
 
+        company_data = i
+        for i in company_data['included']:
+            if i['$type'] == "com.linkedin.voyager.common.FollowingInfo":
+                company_followerCount = i['followerCount']
+
+            if i['$type'] == "com.linkedin.voyager.common.Industry":
+                company_localizedName = i['localizedName']
+
+            if i['$type'] == "com.linkedin.voyager.organization.Company":
+                company_locations = []
+                for l in i["confirmedLocations"]:
+                    l.pop("$type")
+                    company_locations.append(l)
+                company_description = unidecode(i['description']).replace("\n"," ").replace("\r"," ")
+                company_founded = i['foundedOn']['year']
+                company_headquarter = i['headquarter']
+                company_headquarter.pop("$type")
+                company_name = unidecode(i['name']).replace("\n"," ").replace("\r"," ")
+                company_specialities = i['specialities']
+                company_staffCount = i['staffCount']
+                company_universalName = i['universalName']
+                company_profile_url = i['url']
+                company_page_url = i['companyPageUrl']
+                company_jobSearchPageUrl = i['jobSearchPageUrl']
+                company_entityUrn = i['entityUrn']
+                company_id =  re.sub(r"urn:li:fs_normalized_company:","",company_entityUrn)
+        company_details = {"name":company_name,"foundedOn":company_founded,"description":company_description,
+                           "followerCount":company_followerCount,"locations":company_locations,
+                           "headquarter":company_headquarter,"localizedName":company_localizedName,
+                           "website":company_page_url,"profileUrl":company_profile_url,
+                           "specialities":company_specialities,"staffCount":company_staffCount,
+                           "universalName":company_universalName, "entityUrn":company_entityUrn, "id":company_id}
+        if enable_information:
+            print("Success getting information from : {}".format(url))
+        return company_details
+    
+class SearchCompanies():
+    def __init__(self, browser, keyword, RESULT_DIR):
+        self.searchCompanyResult = self.get_companies(browser, keyword, RESULT_DIR)
+        
+    def get_companies(self, browser, keyword, RESULT_DIR):
+        url = "https://www.linkedin.com/search/results/companies/?keywords={}&origin=GLOBAL_SEARCH_HEADER".format(keyword)
+        companies = browser.open(url)
+        companies = companies.soup.find_all("code")
+        for company in companies:
+            try:
+                company = json.loads(company.text)
+            except:
+                pass
+            if "data" in company:
+                if "metadata" in company['data']:
+                    break
+        companies = company
+        total_companies = companies["data"]["metadata"]["totalResultCount"]
+        print('Total companies found based on keyword "{}" : {:,}'.format(keyword, total_companies))
+        companies = companies['data']['elements'][1]['elements']
+
+        searchCompanyResult = []
+        for company in companies:
+            searchCompanyResult.append({"companyName":company['title']['text'],
+                                       "companytargetUrn":company['targetUrn'],
+                                       "companyURL":"https://www.linkedin.com/company/{}".format(company['targetUrn'].replace("urn:li:fs_miniCompany:",""))})
+        print("{:,} companies URL collected".format(len(searchCompanyResult)), end="\r")
+        for i in range(round(total_companies/10+0.45)):
+            if i+1 != 1:
+                url_next = url+"&page={}".format(i+1)
+                companies = browser.open(url_next)
+                companies = companies.soup.find_all("code")
+                for company in companies:
+                    try:
+                        company = json.loads(company.text)
+                    except:
+                        pass
+                    if "data" in company:
+                        if "metadata" in company['data']:
+                            break
+                companies = company
+                try:
+                    companies = companies['data']['elements'][1]['elements']
+                except IndexError:
+                    companies = companies['data']['elements'][0]['elements']
+                for company in companies:
+                    searchCompanyResult.append({"companyName":company['title']['text'],
+                                               "companytargetUrn":company['targetUrn'],
+                                               "companyURL":"https://www.linkedin.com/company/{}".format(company['targetUrn'].replace("urn:li:fs_miniCompany:",""))})
+                print("{:,} companies URL collected".format(len(searchCompanyResult)), end="\r")
+                if len(searchCompanyResult) >= 1000:
+                    print("\nSorry, limit reached! Need a premium LinkedIn account to get all companies!")
+                    break
+        companies = searchCompanyResult
+        del(searchCompanyResult)
+        return companies
+    
+class GetEmployeeOfCompany():
+    def __init__(self, browser, companyName, companyUrn, RESULT_DIR, credentialInfo, complete_information=False):
+        self.searchEmployeeResult = self.get_employee(browser, companyName, companyUrn,
+                                                      RESULT_DIR, credentialInfo, complete_information)
+        
+    def get_employee(self, browser, companyName, companyUrn, RESULT_DIR, credentialInfo, complete_information=False):
+        url = "https://www.linkedin.com/search/results/people/?facetCurrentCompany=%5B%22{}%22%5D&"\
+              "keywords={}&origin=FACETED_SEARCH".format(companyUrn.replace("urn:li:fs_miniCompany:",""),companyName)
+        employees = browser.open(url)
+        employees = employees.soup.find_all("code")
+        for empl in employees:
+            try:
+                empl = json.loads(empl.text)
+            except:
+                pass
+            if "data" in empl:
+                if "metadata" in empl['data']:
+                    break
+        employees = empl
+        total_employees = employees["data"]["metadata"]["totalResultCount"]
+        print("Total employees found on {} : {:,}".format(companyName, total_employees))
+        employees = employees['data']['elements'][1]['elements']
+        searchEmployeeResult = []
+        for empl in employees:
+            if 'headline' in empl:
+                headline = empl['headline']['text']
+            else:
+                headline = None
+            if "snippetText" in empl:
+                snippetText = empl['snippetText']['text']
+            else:
+                snippetText = None
+            if 'publicIdentifier' in empl:
+                searchEmployeeResult.append({"name":empl['title']['text'], "headline":headline, 
+                                             "publicIdentifier":empl['publicIdentifier'], "snippet":snippetText,
+                                             "location":empl['subline']['text'], "entityUrn":empl['targetUrn'], 
+                                             "entityUrn_re":re.sub("urn:li:fs_miniProfile:","",empl['targetUrn']),
+                                             "objectUrn":empl['trackingUrn']})
+            else:
+                searchEmployeeResult.append({"name":'LinkedIn Member', "headline":headline, 
+                                             "publicIdentifier":'Out of Connections', "snippet":snippetText,
+                                             "location":empl['subline']['text'], "entityUrn":'Out of Connections', 
+                                             "entityUrn_re":'Out of Connections',
+                                             "objectUrn":empl['trackingUrn']})
+                
+        print("{:,} employees basic information collected".format(len(searchEmployeeResult)), end="\r")
+        for i in range(round(total_employees/10+0.45)):
+            if i+1 != 1:
+                url_next = url+"&page={}".format(i+1)
+                employees = browser.open(url_next)
+                employees = employees.soup.find_all("code")
+                for empl in employees:
+                    try:
+                        empl = json.loads(empl.text)
+                    except:
+                        pass
+                    if "data" in empl:
+                        if "metadata" in empl['data']:
+                            break
+                employees = empl
+                try:
+                    employees = employees['data']['elements'][1]['elements']
+                except:
+                    employees = employees['data']['elements'][0]['elements']
+
+                for empl in employees:
+                    if 'headline' in empl:
+                        headline = empl['headline']['text']
+                    else:
+                        headline = None
+                    if "snippetText" in empl:
+                        snippetText = empl['snippetText']['text']
+                    else:
+                        snippetText = None
+                    if 'publicIdentifier' in empl:
+                        searchEmployeeResult.append({"name":empl['title']['text'], "headline":headline, 
+                                                     "publicIdentifier":empl['publicIdentifier'], "snippet":snippetText,
+                                                     "location":empl['subline']['text'], "entityUrn":empl['targetUrn'], 
+                                                     "entityUrn_re":re.sub("urn:li:fs_miniProfile:","",empl['targetUrn']),
+                                                     "objectUrn":empl['trackingUrn']})
+                    else:
+                        searchEmployeeResult.append({"name":'LinkedIn Member', "headline":headline, 
+                                                     "publicIdentifier":'Out of Connections', "snippet":snippetText,
+                                                     "location":empl['subline']['text'], "entityUrn":'Out of Connections', 
+                                                     "entityUrn_re":'Out of Connections',
+                                                     "objectUrn":empl['trackingUrn']})
+                print("{:,} employees basic information collected".format(len(searchEmployeeResult)), end="\r")
+                if len(searchEmployeeResult) >= 1000:
+                    print("\nSorry, limit reached! Need a premium LinkedIn account to get all employees!")
+                    break
+        employees = pd.DataFrame(searchEmployeeResult)
+        employees['profileUrl'] = employees['publicIdentifier'].apply(lambda x: "https://www.linkedin.com/in/{}".format(x))
+        del(searchEmployeeResult)
+        
+        if complete_information == True:
+            ori = employees.copy()
+            total_all = len(employees)
+            employees = employees[employees['name'] != "LinkedIn Member"]
+            ori = ori[ori['name'] == "LinkedIn Member"]
+            employees = employees.to_dict('records')
+            total_employees_available = len(employees)
+            print("Total number of employees can be completed : {:,}/{:,}".format(total_employees_available,total_all))
+            
+            temp = []
+            c = 0
+            for i in employees:
+                employee_complete_info = LinkedInAccountScraper.get_account_public_info(browser=browser, 
+                                                                                        url=i['profileUrl'], 
+                                                                                        login_info=credentialInfo)
+                employee_complete_info = {**i, **employee_complete_info}
+                c+=1
+                print("Completing employees information : {:,}/{:,}".format(c,total_employees_available), end="\r")
+                temp.append(employee_complete_info)
+            employees = temp
+            del(temp)
+            employees = pd.DataFrame(employees)
+            employees = pd.concat([employees,ori], ignore_index=True, sort=False)
+        return employees
