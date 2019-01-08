@@ -43,7 +43,7 @@ Or this way if you running on Jupyter Notebook
 ```
 from LinkedInScraper import LinkedInScraper
 
-scraper = LinkedInScraper.LinkedInScraper(email="husnamaulida9@gmail.com", password="kmcantiksayang9")
+scraper = LinkedInScraper.LinkedInScraper(email="your-email", password="your-password")
 scraper.get_user_connections(complete=True)
 ```
 The folder "LinkedIn_Scrape_Result" will be generated to store the output (JSON Format) after scrape proccess finished.
