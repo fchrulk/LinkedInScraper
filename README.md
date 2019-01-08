@@ -3,8 +3,8 @@ Getting data from public LinkedIn Account and still on progress to scrape possib
 
 ## Getting started
 This package allow you to get possible public information data on LinkedIn using Python 3.6
-Right now, it only can be used to login and retrieve information of your current connections.
-The development is still quite far away.
+Right now, it only can be used to login and retrieve information of your current connections, get full company information by LinkedIn url, get employees data from company, and search company by keyword.
+The development is still quite far away. My advice is not to over-take data, maybe just take 50 ~ 100 data per day. LinkedIn can limit data retrieval by notifying "restricted accounts". If this happens, you need to verify your account using a resident card or similar card. So, take your own risk.
 
 ### Prerequisites
 I am running on Windows OS, Python 3.6. Below are the packages that I use to create this script.
@@ -36,6 +36,13 @@ if __name__ == "__main__":
 	args = vars(ap.parse_args())
 
 	main()
+```
+Or this way if you running on Jupyter Notebook
+```
+from LinkedInScraper import LinkedInScraper
+
+scraper = LinkedInScraper.LinkedInScraper(email="husnamaulida9@gmail.com", password="kmcantiksayang9")
+scraper.get_user_connections(complete=True)
 ```
 The folder "LinkedIn_Scrape_Result" will be generated to store the output (JSON Format) after scrape proccess finished.
 
