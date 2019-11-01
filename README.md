@@ -74,7 +74,7 @@ The folder "LinkedIn_Scrape_Result" will be generated to store the output (JSON 
 
 * **Fachrul Kurniansyah** - *LinkedInScraper* - [fchrulk](https://github.com/fchrulk)
 
-#### Feel Free to Discuss
-LinkedIn : [Fachrul Kurniansyah](https://www.linkedin.com/in/fchrulk)<br>
-Email    : fachrul.kurniansyah@gmail.com
+#### Feel Free to Discuss :relieved:
+:id:LinkedIn&emsp;: [Fachrul Kurniansyah](https://www.linkedin.com/in/fchrulk)<br>
+:e-mail:Email&emsp;: fachrul.kurniansyah@gmail.com
 
